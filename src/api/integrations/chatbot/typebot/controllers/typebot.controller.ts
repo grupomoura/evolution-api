@@ -570,6 +570,8 @@ export class TypebotController extends ChatbotController implements ChatbotContr
     let listeningFromMe = data?.typebot?.listeningFromMe;
     let stopBotFromMe = data?.typebot?.stopBotFromMe;
     let keepOpen = data?.typebot?.keepOpen;
+    let debounceTime = data?.typebot?.debounceTime;
+    let ignoreJids = data?.typebot?.ignoreJids;
 
     const defaultSettingCheck = await this.settingsRepository.findFirst({
       where: {
@@ -586,15 +588,20 @@ export class TypebotController extends ChatbotController implements ChatbotContr
       !unknownMessage ||
       !listeningFromMe ||
       !stopBotFromMe ||
-      !keepOpen
+      !keepOpen ||
+      !debounceTime ||
+      !ignoreJids
     ) {
-      if (!expire) expire = defaultSettingCheck?.expire || 0;
-      if (!keywordFinish) keywordFinish = defaultSettingCheck?.keywordFinish || '#SAIR';
-      if (!delayMessage) delayMessage = defaultSettingCheck?.delayMessage || 1000;
-      if (!unknownMessage) unknownMessage = defaultSettingCheck?.unknownMessage || 'Desculpe, não entendi';
-      if (!listeningFromMe) listeningFromMe = defaultSettingCheck?.listeningFromMe || false;
-      if (!stopBotFromMe) stopBotFromMe = defaultSettingCheck?.stopBotFromMe || false;
-      if (!keepOpen) keepOpen = defaultSettingCheck?.keepOpen || false;
+      if (expire === undefined || expire === null) expire = defaultSettingCheck.expire;
+      if (keywordFinish === undefined || keywordFinish === null) keywordFinish = defaultSettingCheck.keywordFinish;
+      if (delayMessage === undefined || delayMessage === null) delayMessage = defaultSettingCheck.delayMessage;
+      if (unknownMessage === undefined || unknownMessage === null) unknownMessage = defaultSettingCheck.unknownMessage;
+      if (listeningFromMe === undefined || listeningFromMe === null)
+        listeningFromMe = defaultSettingCheck.listeningFromMe;
+      if (stopBotFromMe === undefined || stopBotFromMe === null) stopBotFromMe = defaultSettingCheck.stopBotFromMe;
+      if (keepOpen === undefined || keepOpen === null) keepOpen = defaultSettingCheck.keepOpen;
+      if (debounceTime === undefined || debounceTime === null) debounceTime = defaultSettingCheck.debounceTime;
+      if (ignoreJids === undefined || ignoreJids === null) ignoreJids = defaultSettingCheck.ignoreJids;
 
       if (!defaultSettingCheck) {
         await this.settings(instance, {
@@ -605,6 +612,8 @@ export class TypebotController extends ChatbotController implements ChatbotContr
           listeningFromMe: listeningFromMe,
           stopBotFromMe: stopBotFromMe,
           keepOpen: keepOpen,
+          debounceTime: debounceTime,
+          ignoreJids: ignoreJids,
         });
       }
     }
@@ -670,52 +679,6 @@ export class TypebotController extends ChatbotController implements ChatbotContr
         'init',
         prefilledVariables,
       );
-
-      // const response = await this.typebotService.createNewSession(instanceData, {
-      //   enabled: true,
-      //   url: url,
-      //   typebot: typebot,
-      //   remoteJid: remoteJid,
-      //   expire: expire,
-      //   keywordFinish: keywordFinish,
-      //   delayMessage: delayMessage,
-      //   unknownMessage: unknownMessage,
-      //   listeningFromMe: listeningFromMe,
-      //   stopBotFromMe: stopBotFromMe,
-      //   keepOpen: keepOpen,
-      //   prefilledVariables: prefilledVariables,
-      //   typebotId: findBot.id,
-      // });
-
-      // if (response.session) {
-      //   await this.typebotService.sendWAMessage(
-      //     instanceData,
-      //     response.session,
-      //     {
-      //       expire: expire,
-      //       keywordFinish: keywordFinish,
-      //       delayMessage: delayMessage,
-      //       unknownMessage: unknownMessage,
-      //       listeningFromMe: listeningFromMe,
-      //       stopBotFromMe: stopBotFromMe,
-      //       keepOpen: keepOpen,
-      //     },
-      //     remoteJid,
-      //     response.messages,
-      //     response.input,
-      //     response.clientSideActions,
-      //   );
-
-      //   this.waMonitor.waInstances[instance.instanceName].sendDataWebhook(Events.TYPEBOT_START, {
-      //     remoteJid: remoteJid,
-      //     url: url,
-      //     typebot: typebot,
-      //     prefilledVariables: prefilledVariables,
-      //     sessionId: `${response.sessionId}`,
-      //   });
-      // } else {
-      //   throw new Error('Session ID not found in response');
-      // }
     } else {
       const id = Math.floor(Math.random() * 10000000000).toString();
 
@@ -980,13 +943,7 @@ export class TypebotController extends ChatbotController implements ChatbotContr
 
       const content = getConversationMessage(msg);
 
-      let findBot = (await this.findBotTrigger(
-        this.botRepository,
-        this.settingsRepository,
-        content,
-        instance,
-        session,
-      )) as TypebotModel;
+      let findBot = (await this.findBotTrigger(this.botRepository, content, instance, session)) as TypebotModel;
 
       if (!findBot) {
         const fallback = await this.settingsRepository.findFirst({
@@ -1026,15 +983,15 @@ export class TypebotController extends ChatbotController implements ChatbotContr
       let debounceTime = findBot?.debounceTime;
       let ignoreJids = findBot?.ignoreJids;
 
-      if (!expire) expire = settings.expire;
-      if (!keywordFinish) keywordFinish = settings.keywordFinish;
-      if (!delayMessage) delayMessage = settings.delayMessage;
-      if (!unknownMessage) unknownMessage = settings.unknownMessage;
-      if (!listeningFromMe) listeningFromMe = settings.listeningFromMe;
-      if (!stopBotFromMe) stopBotFromMe = settings.stopBotFromMe;
-      if (!keepOpen) keepOpen = settings.keepOpen;
-      if (!debounceTime) debounceTime = settings.debounceTime;
-      if (!ignoreJids) ignoreJids = settings.ignoreJids;
+      if (expire === undefined || expire === null) expire = settings.expire;
+      if (keywordFinish === undefined || keywordFinish === null) keywordFinish = settings.keywordFinish;
+      if (delayMessage === undefined || delayMessage === null) delayMessage = settings.delayMessage;
+      if (unknownMessage === undefined || unknownMessage === null) unknownMessage = settings.unknownMessage;
+      if (listeningFromMe === undefined || listeningFromMe === null) listeningFromMe = settings.listeningFromMe;
+      if (stopBotFromMe === undefined || stopBotFromMe === null) stopBotFromMe = settings.stopBotFromMe;
+      if (keepOpen === undefined || keepOpen === null) keepOpen = settings.keepOpen;
+      if (debounceTime === undefined || debounceTime === null) debounceTime = settings.debounceTime;
+      if (ignoreJids === undefined || ignoreJids === null) ignoreJids = settings.ignoreJids;
 
       if (this.checkIgnoreJids(ignoreJids, remoteJid)) return;
 

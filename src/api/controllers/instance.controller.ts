@@ -63,6 +63,9 @@ export class InstanceController {
         instanceId,
         integration: instanceData.integration,
         instanceName: instanceData.instanceName,
+        ownerJid: instanceData.ownerJid,
+        profileName: instanceData.profileName,
+        profilePicUrl: instanceData.profilePicUrl,
         hash,
         number: instanceData.number,
         businessId: instanceData.businessId,
@@ -119,6 +122,7 @@ export class InstanceController {
         readMessages: instanceData.readMessages === true,
         readStatus: instanceData.readStatus === true,
         syncFullHistory: instanceData.syncFullHistory === true,
+        wavoipToken: instanceData.wavoipToken || '',
       };
 
       await this.settingsService.create(instance, settings);
@@ -360,31 +364,31 @@ export class InstanceController {
   public async fetchInstances({ instanceName, instanceId, number }: InstanceDto, key: string) {
     const env = this.configService.get<Auth>('AUTHENTICATION').API_KEY;
 
-    let name = instanceName;
-    // let arrayReturn = false;
-
     if (env.KEY !== key) {
-      const instanceByKey = await this.prismaRepository.instance.findMany({
+      const instancesByKey = await this.prismaRepository.instance.findMany({
         where: {
           token: key,
+          name: instanceName || undefined,
+          id: instanceId || undefined,
         },
       });
 
-      if (instanceByKey) {
-        name = instanceByKey[0].name;
-        // arrayReturn = true;
+      if (instancesByKey.length > 0) {
+        const names = instancesByKey.map((instance) => instance.name);
+
+        return this.waMonitor.instanceInfo(names);
       } else {
         throw new UnauthorizedException();
       }
     }
 
-    if (name) {
-      return this.waMonitor.instanceInfo(name);
-    } else if (instanceId || number) {
+    if (instanceId || number) {
       return this.waMonitor.instanceInfoById(instanceId, number);
     }
 
-    return this.waMonitor.instanceInfo();
+    const instanceNames = instanceName ? [instanceName] : null;
+
+    return this.waMonitor.instanceInfo(instanceNames);
   }
 
   public async setPresence({ instanceName }: InstanceDto, data: SetPresenceDto) {
@@ -409,15 +413,11 @@ export class InstanceController {
 
   public async deleteInstance({ instanceName }: InstanceDto) {
     const { instance } = await this.connectionState({ instanceName });
-
-    if (instance.state === 'open') {
-      throw new BadRequestException('The "' + instanceName + '" instance needs to be disconnected');
-    }
     try {
       const waInstances = this.waMonitor.waInstances[instanceName];
       if (this.configService.get<Chatwoot>('CHATWOOT').ENABLED) waInstances?.clearCacheChatwoot();
 
-      if (instance.state === 'connecting') {
+      if (instance.state === 'connecting' || instance.state === 'open') {
         await this.logout({ instanceName });
       }
 
